@@ -11,48 +11,13 @@ output:
 **15 pnts**
 
 ## Objectives
- In this module you will:<br><br>
- -Retrieve flow data using the dataretrieval package<br>
- -Learn to retrieve and manage digital elevation models<br> 
- -Retrieve and import remotely sensed data for the watershed extent<br> 
-
-
-## Background
-
-### A refresher in GIS concepts:
-  This module assumes familiarity with basic Geographic Information System (GIS) such as coordinate systems (latitude and lognitude, UTM). Some terms to recall: 
-  
-  **Gridded data** refers to spatial data in raster format. If you have performed any GIS work, you are likely using gridded data. Rasters organize geographical areas into a grid where each regularly spaced cell represents a specific location and contains some attribute representing that location. For example, digital elevation models (DEM) are a form of gridded data. Imagine that we are working in a watershed and we can drop a grid or square celled net over the entire catchment. We can then model the elevation data of that catchment by assigning each cell in the net a mean elevation value for the area represented by the cell. Similarly, we can assign any value we wish to model to the cells. If we were to drop another net and assign a maximum tree height to every cell, we would be adding another 'layer' to our model. The **spatial resolution** of gridded data refers to the length and width of each cell represents. If we want to observe gridded data over time, we can generate a raster stack, where each raster layer represents a point in time. With a raster stack, we can increase the **temporal resolution** of our gridded data. 
-
-  **Vector data** describes spatial features using points, lines, and polygons. These spatial features are represented a geometrical objects with associated attributes, like lines to represent linear features such as rivers, or points to represent single locations. We will work with a .shp file in this module that is a collection of points representing the boundary of a watershed. 
-
-  **Tabular data** refers to data organized in a row-column format. In this class, each of our .csv datasets are a form of tabular data. 
-
-### A refresher in remote sensing:
-
-Remote sensing is the science of obtaining information about objects or areas from a distance, typically from aircraft or satellites. It involves the collection and interpretation of data gathered by sensors that detect electromagnetic radiation reflected or emitted from the Earth's surface and atmosphere. As ecologists, many of us utilize remote sensing to observe and analyze the Earth's surface and its dynamics, providing valuable insights into environmental processes, land use and land cover changes, natural disasters, and more. 
-Some helpful terms to recall:
-
-**spatial resolution:** Remotely sensed data can vary in its spatial resolution, which refers to the scale of the smallest unit, or level of visual detail. 
-
-**temporal resolution:** When used to describe remotely sensed data, we are often talking about how frequently a remote sensing system revisits the same area on the Earth surface. Systems with high temporal resolution revisit the same location frequently, allowing for monitoring rapid changes in phenomena, where a lower resolution may limit a system's ability to capture short-term events. 
-
-We often find that data collection requires a balance of spatial and temporal resolution to select the most appropriate data for the coverage and detail that ecological work requires. 
-
-### Ethical conduct
-
-When utilizing publicly available datasets, it is important for us as users to:<br><br>
-  -Be aware of any copyright or licensing agreements. There may be restrictions or usage terms imposed by data providers. Read provided agreements or terms to be sure we are in compliance with these when using datasets in our research. This may also include requirements for registration or subscription established by providers or agencies like USGS or NASA.<br><br>
-  -Cite and acknowledge the contributions of data providers and researchers whose datasets we utilize. This also facilitates transparency and reproducibility in our research.<br><br>
-  - Assess the quality and accuracy of geospatial data before using it for decision making purposes. It is important that we consider spatial resolution, temporal resolution and metadata documentation to critically evaluate the reliability of the datasets we use.<br><br> 
-  -Promote Open Data Principles: Try to explore and use publicly available datasets that support transparency and collaboration within our scientific and academic communities.<br><br>
-  
-## Codework
-
-In this module we will import streamflow (tablular) data, using USGS's DataRetrieval package, then visualize vector data to delineate our area of interest and learn how to find spatial gridded data for the area. 
+ In this lab you will:
+ -Retrieve flow data using the dataretrieval package
+ -Learn to retrieve and manage digital elevation models
+ -Retrieve and import remotely sensed data for the watershed extent
 
 ### Setup:<br>
-When importing packages and setting parameters, think about how the local working environment can vary among users and computers. A function that examines and installs packages before importing them enhances the script's ability to be easily used by others. 
+When importing packages and setting parameters, think about how the local working environment can vary among users and computers. A function that examines and installs packages before importing them enhances the script's ability to be easily used by others (a.k.a., enhances reproducibility). 
 
 ```{r include=FALSE}
 # Above, include = FALSE means this chunk of script will not show when you convert this Markdown document to an HTML.
@@ -66,7 +31,7 @@ pkgTest <- function(x)
 }
 
 # Make a vector of the packages you need
-neededPackages <- c('tidyverse', 'dplyr', 'dataRetrieval', 'raster', 'sp', 'sf', 'leaflet', 'terra', 'MODIStsp') 
+neededPackages <- c('tidyverse', 'dplyr', 'dataRetrieval', 'raster', 'sp', 'sf', 'leaflet', 'terra', 'ggplot2', 'plotly') 
 # dataRetrieval - access data from NWIS
 # sf - open and manage .shp files
 # leaflet - one option for interactive visualization of spatial data
@@ -76,98 +41,106 @@ neededPackages <- c('tidyverse', 'dplyr', 'dataRetrieval', 'raster', 'sp', 'sf',
 for (package in neededPackages){pkgTest(package)}
 ```
 
-### Selecting a watershed: 
-Here, we are using USGS' dataRetrieval package to search and filter hydrologic datasets. There are many ways data can be searched; more can be found in this [dataRetrieval vingette](https://cran.r-project.org/web/packages/dataRetrieval/vignettes/dataRetrieval.html). In this example, we will fetch USGS site numbers for Colorado watersheds with streamflow (discharge) data for a specified time period. 
+In this lab, we will use the USGS dataRetrieval package to search for and filter hydrologic datasets directly from the USGS Water Data system. This package provides a powerful interface for discovering monitoring locations, identifying available parameters, and downloading time series data.
 
+The package has recently undergone updates, and several older NWIS functions are being replaced with newer read_waterdata_*() functions. If you encounter warnings referencing deprecated NWIS functions, this simply means the function has a newer equivalent. The most up-to-date guidance can be found in the official USGS tutorial:[dataRetrieval tutorial](https://https://waterdata.usgs.gov/blog/dataretrieval/).
+
+If you currently use scripts that utilize older API's, and want more on the transition see: (https://waterdata.usgs.gov/blog/api-waterservices-decom/)
+
+In this example, we will use the new functions identify USGS monitoring locations in Colorado that:
+
+--Represent stream sites
+
+--Fall within a defined watershed size range
+
+--Report discharge (streamflow) data
+
+--Contain records during a specified time period
+
+The objective is not just to download data, but to learn how to determine whether data exist for a given site before building an analysis workflow. This is a critical step in developing independent research projects. By building your workflow directly from publicly available data using scripted queries, you ensure that your analysis is transparent, reproducible, and easily updated in the future.
 
 ```{r}
 # Start by defining and storing your search parameters as variables at the beginning of the script. This practice enables you and other users to easily modify the search parameters from a single location within the script.
 
-stateCd <- "CO"  # COLORADO
-parameterCd <- "00060"  # Discharge (cubic feet per second)
-start_date <- "2023-01-01"
-end_date <- "2023-12-31"
-gage_no <- '401733105392404' #'05015500' #"05017500"
-
-
-sites <- whatNWISsites(stateCd = stateCd, parameterCd = parameterCd)
+state_name <- "Colorado"  
+gage_no <- 'USGS-09034000'
 ```
 
-**Q1** (2pnts). If you were creating this script for your work team's shared collaboration, or for yourself to use again a year from now, what might be the disadvantages of embedding search parameters directly into the function parameters? 
+**Q1 (2pnts). If you were creating this script for your work team's shared collaboration, or for yourself to use again a year from now, what might be the disadvantages of embedding search parameters directly into the function parameters?** 
 
 ANSWER: 
 
-**Q2** (2pnts). What is a potential use for whatNWISsites?
-
-ANSWER:
-
-**EXTRA** (1pnt): Why might the above script return an error if dpylr:: is not placed before select()?
-
-ANSWER: 
 
 ```{r}
-# Now we will request more data from these sites by looping through the list we just generated. This chunk will take several minutes. Feel free to comment this out if needed once you have executed it once.
-
-# Initialize an empty dataframe to store the results from each list item
-all_site_data <- data.frame()
-
-for (site in sites$site_no) { #for every value in site_no column of sites
-  siteINFO <- readNWISsite(site) %>% #read the site data
-    # filter by drainage area
-    filter(drain_area_va < 300 & drain_area_va > 250) %>%
-    # select a subset of potential columns
-    dplyr::select('agency_cd', "site_no",'station_nm', "lat_va","long_va", "drain_area_va")
-
-    # Add the siteINFO to the all_site_data dataframe
-    all_site_data <- bind_rows(all_site_data, siteINFO)
-}
-
-# Note that the results of each iteration of the loop need to be stored by adding them to the empty dataframe before the 'for' loop. If your result contains only one iteration worth of data, you may have forgotten this step.
+# Let's see what sites are available within the state. This will return something like 39000 sites without a filter, so we'll filter by drainage area to give us a managable df.
+sites <- read_waterdata_monitoring_location(state_name = state_name) %>% # filter by drainage area
+    filter(drainage_area < 300 & drainage_area > 250) 
 ```
-drain_area_va is a column value returned by readNWISsite. [Other variables can be found here](https://rconnect.usgs.gov/dataRetrieval/reference/readNWISsite.html)
 
-**Q3** (1pnt). In a sentence, what does this dataframe (all_site_data) tell you?
+**Q2 (1pnt). In a sentence, what does this dataframe (sites) tell you?**
 
 ANSWER: 
 
 
-Note that while your research interests may not require streamflow data, it can serve as a valuable resource for a wide array of data types. 
+If you look at the 'sites' dataframe that is now in the Data section of your Global Environment. It should contain ~44 observations. Try clicking on the drop down arrow by the dataframe name to see the structure, or head() or str() to get a quick glance at the df without opening the entire table. You can see that we get some site information here, but not enough metadata to tell us what kind of data is being monitored/collected at the site. Let's use the read_watershed_ts_meta() function to pull metadata, and then filter by parameter. 
+
+How can we figure out the parameter codes for the the variables that we want to filter by? 
+```{r}
+param_codes <-read_waterdata_parameter_codes()
+```
+
+There are a lot of options available here, though this does not mean these are available at every site. I just wanted you to see the kinds of variables you could search for when developing/refining your question for the term project. Since we know we want discharge, lets narrow down the scope of codes. 
+
+```{r}
+read_waterdata_parameter_codes(
+  parameter_name = "Discharge"
+) %>%
+  dplyr::select(parameter_code, parameter_name, unit_of_measure)
+```
+
+**(1pt) Below, use the parameter code to collect sites that report in ft3/s** 
+This is typically how discharge is reported by federal agencies in the U.S., though you will see hydrologists convert to metric when modeling or disseminating.
+
+```{r}
+#Now filter for sites containing discharge data:
+sites_discharge <- sites %>%
+  semi_join(
+    read_waterdata_ts_meta(
+      monitoring_location_id = sites$monitoring_location_id
+    ) %>%
+      filter(parameter_code == "00060") %>%  
+     distinct(monitoring_location_id),
+   by = "monitoring_location_id"
+  )
+```
+
+Note that while your research interests may not require streamflow data, dataRetrieval can serve as a valuable resource for a wide array of data types. 
 
 
-
-For the remainder of this assignment, we'll focus on a single watershed in central Colorado near the Experimental Forest that we explored in the Snowmelt module. There are several dataRetrieval functions could we utilize to see what data is available for a particular site number. Check [dataRetrieval docs](https://waterdata.usgs.gov/blog/dataretrieval/) to learn package functions or tools.
+For the remainder of this assignment, we'll focus on a single watershed in central Colorado near the Fraser Experimental Forest. Lets use the read_waterdata_ts_meta again to see what data is available for a particular site number. Note that we saved gage_no for the desired site above when we defined parameter values for the script.
 
 ```{r}
 # Check data availability for the gage of interest
-dataavailable <- whatNWISdata(siteNumber = gage_no, service="all")
+dataavailable <- read_waterdata_ts_meta(monitoring_location_id = gage_no)
 ```
 
-**Q4** (4pnts). Find the longest running dataset in DataAvailable (i.e. either by count or by start and end date). Use https://help.waterdata.usgs.gov to look up the meaning of some of column headers and the codes associated with them.<br> 
-a. What kind of data does this long running dataset hold? <br> 
-b. What column did you use to learn that? <br> 
-c. What does 'dv' mean in data_type_cd? <br> 
+**Q3 (2pnts). From dataavailable,** a. Identify one parameter at this site that is not discharge (00060). What does it measure, and in what units?
+
+b. Based on the begin and end dates of that parameter’s record, would you consider this dataset suitable for long-term trend analysis? Briefly justify your answer.
+
 
 ANSWER: 
 
-
-
 ### Flow data retrieval:
-
+For this, we are going to use the legacy function (NWIS). You will get a warning, that is fine. The newest data is not yet available for this site with the new functions. This could be the case with sites of interest for your projects as well. In that case, the legacy functions will work through the end of the semester. 
 ```{r}
-# Can change filter() arguments to use as you need
-
-# CHECK UNITS of data imported:
-parameterCdFile %>% 
-  filter(srsname == 'Precipitation', parameter_cd =='00045')
-```
-
-```{r}
-#import - determine years of burn
-gage_no <- '09032100' 
-
 # Raw daily data:
-rawQData <- readNWISdv(gage_no, parameterCd, 
-                        "2014-01-01", "2024-01-01")
+rawQData <- readNWISdv(
+  siteNumbers = "06730200",
+  parameterCd = "00060",
+  startDate = "2014-01-01",
+  endDate = "2024-01-01"
+)
 ```
 
 Let's rename our columns. For this you will need to determine the units of the date 
@@ -189,7 +162,7 @@ ggplot(rawQData, aes(x = Date, y = ft3sec)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-**Q5** (2pnts). Based on the hydrograph plot, what type of precipitation events appear to influence the observed intra-annual variations in flow rates? 
+**Q4 (2pnts). Based on the hydrograph plot, what type of precipitation events appear to influence the observed intra-annual variations in flow rates?** 
 
 ANSWER: 
 
@@ -198,7 +171,7 @@ ANSWER:
 
 ### Watershed boundary vector data: 
 
-A boundary shapefile has been provided to save time and improve repeatability. Watershed boundaries for gauging stations can be found at [USGS StreamStats](https://streamstats.usgs.gov/ss/) by zooming into the water map and clicking 'Delineate' near your desired gage or point. Once your watershed is delineated, you can click on 'Download Basin' and select from a choice of file types. This can be a great to to delineate river basins if all you require is a shapefile. For smaller streams, other analyses are available. We will cover those in the next module. 
+A boundary shapefile has been provided to save time and improve repeatability. Watershed boundaries for gauging stations can be found at [USGS StreamStats](https://streamstats.usgs.gov/ss/) by zooming into the water map and clicking 'Delineate' near your desired gage or point. Once your watershed is delineated, you can click on 'Download Basin' and select from a choice of file types. This can be an easy to to delineate river basins if all you require is a shapefile, though there are a lot of tools available for further hydrological analysis (e.g. Whitebox, SAGA)...more on that later. We will cover those in a future module. 
 
 Let's import a pre-created shapefile: 
 
@@ -303,7 +276,7 @@ Let's say we want an NDVI map layer from summer of 2020. In 'date range', select
 We can skip ‘Additional Criteria’ for now and go to ‘Results’. You should receive a set of about 11 images. For each image you can check out the metadata. That is the 'pen and notepad' icon in the middle of image specific menu. Here you can look at data like cloud cover. For these images, the values you see are a cloud coverage percent. Cloud coverage measurements and the codes to filter for certain cloud cover thresholds may change across missions. If you are retrieving Landsat data for time series using code, it will be important to explore the different quality control parameters and what they represent. You don't need to download anything for this assignment, we've provided it for you. However to gain familiarity with this process, click on the 'download' icon for July 7, 2020 and click 'select files' on the Reflectance Bands option. 
 
 
-**Q6** (1pnt): What 2 bands should we download to calculate NDVI?
+**Q5 (1pnt): What 2 bands should we download to calculate NDVI?**
 
 Answer:
 
@@ -344,12 +317,12 @@ plot(ws_boundary, add = TRUE, border = "black", lwd = 2, col = "transparent")
 ```
 
 
-**Q7** (1pnt)  What does 'SR' in the .tif names tell us about the data?
+**Q6 (1pnt)  What does 'SR' in the .tif names tell us about the data?**
 
 ANSWER: 
 
 
-**Q8** (2pnts)  What is the difference between 'mask' and 'crop' when filtering large files to fit the area of interest?
+**Q7 (2pnts)  What is the difference between 'mask' and 'crop' when filtering large files to fit the area of interest?**
 
 
 ANSWER: 
@@ -368,7 +341,7 @@ Another effective way to access evaluate large spatial datasets is through Googl
 
 ###### GEE Access
 
-If spatial data is something you may need for your MS project, we recommend exploring this resource
+If spatial data is something you may need for your dissertation or MS project, we recommend exploring this resource.
 
 **Sign Up:** Go to the Google Earth Engine website (https://earthengine.google.com/) and sign in with your Google account. If you don't have a Google account, you can sign up for access by filling out a request form.
 
@@ -386,6 +359,19 @@ Colorado State University also has a [great tutorial here](https://ecology.colos
 
 Note that JavaScript is the default language for the code editor interface in your web browser. If you are familiar with Python, GEE provides a Python API that can allow you to use Python syntax. If neither of these languages are familiar, don't give up yet! You can still use this tool with your R coding background and trial and error. We recommend finding other scripts that suit your need (there are a lot of shared resources online) and adapting them to your area of interest. Once you understand coding concepts, like those in R, other languages can be picked up easily. You will find that you are learning JavaScript before you realize it. 
 
+**Q8 (4 pts) Using the monitoring data tools (e.g., USGS dataRetrieval) and/or spatial data platforms (e.g., Google Earth Engine, LandTrendr), describe one relationship or pattern you are curious about exploring (1–2 sentences). This does not need to be your final project question, just a realistic relationship that could be investigated within a few weeks using available data.**
+
+In your response, include:
+
+What type of data would be needed (e.g., discharge, NDVI, land cover, climate, water quality, burn severity, etc.)
+
+How can we help you move forward?
+ For example: Are you unsure what platform hosts the data?
+              Do you need help determining whether data exist?
+              Are you uncertain how to organize or analyze the data?
+              Is there a technical skill you need to build?
+
+Be honest and specific. The goal is to start shaping a feasible term project and identify where support will be most useful.
 
 
 
